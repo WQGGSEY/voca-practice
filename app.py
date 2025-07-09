@@ -7,7 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
-from st_click_detector import st_click_detector # 라이브러리 import
+import st_click_detector # 라이브러리 import
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
