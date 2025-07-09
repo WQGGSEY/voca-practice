@@ -49,12 +49,12 @@ def get_db_as_dataframe(database_id: str, token: str) -> pd.DataFrame | None:
             })
 
         if not processed_pages: return pd.DataFrame()
-        
+
         df = pd.DataFrame(processed_pages)
         if 'last_edited_time' in df.columns:
             df['last_edited_time'] = pd.to_datetime(df['last_edited_time'], errors='coerce')
         return df
-        
+
     except Exception as e:
         st.error(f"❌ Notion 데이터 로딩 오류: {e}")
         return None
@@ -70,9 +70,9 @@ def create_synonym_groups(df: pd.DataFrame, decay_const: float = 0.023) -> list[
     for _, row in df.iterrows():
         main_word, synonyms_str = row['word'], row['Synonyms']
         timestamp = row['last_edited_time']
-        
+
         if not (isinstance(main_word, str) and main_word.strip()): continue
-        
+
         synonyms_list = [s.strip() for s in synonyms_str.split(',') if s.strip()] if isinstance(synonyms_str, str) else []
         if synonyms_list:
             weight = 1.0
@@ -81,7 +81,7 @@ def create_synonym_groups(df: pd.DataFrame, decay_const: float = 0.023) -> list[
                 weight = np.exp(-decay_const * days_elapsed)
 
             structured_groups.append({'main': main_word.strip(), 'synonyms': synonyms_list, 'weight': weight})
-    
+
     return structured_groups
 
 def get_synset(word):
@@ -96,7 +96,7 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
     """지정된 개수만큼 중복되지 않는 퀴즈 문제 리스트를 생성합니다."""
     questions = []
     if not groups: return []
-    
+
     weights = [g['weight'] for g in groups]
     all_words = list(set(w for group in groups for w in [group['main']] + group['synonyms']))
     used_question_words = set()
@@ -105,14 +105,14 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
 
     while len(questions) < num_questions and attempts < max_attempts:
         attempts += 1
-        
+
         correct_group = random.choices(groups, weights=weights, k=1)[0]
-        
+
         if random.random() < 0.8:
             question_word, answer_word = correct_group['main'], random.choice(correct_group['synonyms'])
         else:
             question_word, answer_word = random.choice(correct_group['synonyms']), correct_group['main']
-            
+
         if question_word in used_question_words: continue
 
         question_synset = get_synset(question_word)
@@ -129,21 +129,21 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
                 similarity = question_synset.wup_similarity(candidate_synset)
                 if similarity is not None and similarity < similarity_threshold:
                     distractors.append(candidate)
-        
+
         if len(distractors) < 3: continue
 
         used_question_words.add(question_word)
-        
+
         options = [answer_word] + distractors
         random.shuffle(options)
         options.append("I don't know.")
-        
+
         questions.append({
             "question_word": question_word,
             "options": options,
             "answer": answer_word
         })
-        
+
     return questions
 
 # --- 3. Streamlit UI 구성 ---
@@ -187,7 +187,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             question_data = st.session_state.questions[current_q_index]
             st.subheader(f"Q: '{question_data['question_word']}'의 유의어는?")
             user_choice = st.radio("다음 중 정답을 고르세요:", options=question_data['options'], index=None, key=f"q_{current_q_index}")
-            
+
             if st.button("확인", key=f"submit_{current_q_index}"):
                 if user_choice:
                     st.session_state.user_answers[current_q_index] = user_choice
@@ -206,7 +206,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             score = st.session_state.score
             st.metric(label="정답률", value=f"{score / total_questions:.2%}", delta=f"{score} / {total_questions} 문제")
             st.balloons()
-            
+
             # --- 틀린 문제 저장 ---
             if not st.session_state.get('result_saved', False):
                 incorrect_answers = []
@@ -217,7 +217,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
                             "문제 번호": i + 1, "문제 단어": q_data['question_word'],
                             "선택한 답": user_answer, "정답": q_data['answer']
                         })
-                
+
                 if incorrect_answers:
                     result_df = pd.DataFrame(incorrect_answers)
                     result_dir = "result"
@@ -255,7 +255,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             "풀고 싶은 문제 수를 입력하세요:", min_value=5, max_value=max_q,
             value=min(25, max_q), step=1
         )
-        
+
         similarity_threshold = st.slider(
             "오답 선택지 난이도 조절 (Similarity Threshold):",
             min_value=0.1, max_value=0.9, value=0.6, step=0.05
@@ -269,7 +269,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
         if st.button("퀴즈 시작하기!", type="primary"):
             with st.spinner("유사도 기반으로 문제를 생성하는 중입니다..."):
                 questions = generate_quiz_questions(synonym_groups, num_q_input, similarity_threshold)
-            
+
             if len(questions) >= num_q_input:
                 st.session_state.questions = questions
                 st.session_state.current_q = 0
@@ -330,7 +330,7 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
 
     # --- 클릭 가능한 플래시카드 UI ---
     current_group = st.session_state.study_groups[current_index]
-    
+
     card_style = """
         width: 100%;
         height: 250px;
@@ -347,10 +347,8 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         text-decoration: none; /* 링크 밑줄 제거 */
         color: inherit; /* 링크 색상 상속 */
     """
-    
-    # ⭐️⭐️⭐️ 수정된 핵심 부분 시작 ⭐️⭐️⭐️
-    unique_card_id = f"card-{'front' if not st.session_state.card_flipped else 'back'}-{current_index}"
 
+    unique_card_id = f"card-{'front' if not st.session_state.card_flipped else 'back'}-{current_index}"
     html_content = f"<a href='#' id='{unique_card_id}' style='{card_style}'>"
 
     if not st.session_state.card_flipped:
@@ -366,12 +364,10 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         """
     html_content += "</a>"
 
-    # st_click_detector 대신 click_detector를 사용하고, id가 있는 a 태그를 포함한 html을 전달
     clicked = click_detector(html_content, key=f"detector_{current_index}")
-    
-    # ⭐️⭐️⭐️ 수정된 핵심 부분 끝 ⭐️⭐️⭐️
 
     if clicked:
-        # 클릭이 감지되면 카드 상태를 뒤집고 rerun
+        # 클릭이 감지되면 카드 상태를 뒤집기만 함 (st.rerun() 제거)
+        # Streamlit이 session_state의 변경을 감지하고 자동으로 스크립트를 재실행함
         st.session_state.card_flipped = not st.session_state.card_flipped
-        st.rerun()
+        # st.rerun() # 👈 이 부분을 제거하여 이중 재실행 문제 해결
