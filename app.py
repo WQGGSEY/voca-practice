@@ -300,8 +300,6 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     total_cards = len(st.session_state.study_groups)
     current_index = st.session_state.card_index
 
-    # 이전/다음 버튼을 누를 때마다 card_flipped 상태를 초기화하고 rerun
-    # 이 부분이 없으면 다음 카드로 넘어갔을 때 이전 카드의 뒤집힌 상태가 유지됨
     col1, col2, col3, col4 = st.columns([1.5, 1.5, 5, 1.5])
 
     with col1:
@@ -328,96 +326,88 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
             st.session_state.card_flipped = False
             st.rerun()
 
-
     st.divider()
 
 
     # ⭐️⭐️⭐️ 수정된 핵심 부분 시작 ⭐️⭐️⭐️
 
     # --- 카드 뒤집기 애니메이션을 위한 CSS ---
-    card_flip_css = f"""
+    card_css = """
     <style>
-        .card-container {{
-            perspective: 1000px;
+        .card-container {
             width: 100%;
             height: 250px;
-        }}
-        .card {{
+            perspective: 1000px;
+        }
+        .card-flipper {
             width: 100%;
             height: 100%;
             position: relative;
-            transition: transform 0.6s;
             transform-style: preserve-3d;
-            cursor: pointer;
-        }}
-        .card.is-flipped {{
+            transition: transform 0.6s;
+        }
+        .card-flipper.is-flipped {
             transform: rotateY(180deg);
-        }}
-        .card-face {{
+        }
+        .card-face {
             position: absolute;
             width: 100%;
             height: 100%;
+            -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             border: 1px solid #e6e6e6;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }}
-        .card-front {{
-            background-color: white;
-        }}
-        .card-back {{
-            background-color: white;
+        }
+        .card-back {
             transform: rotateY(180deg);
+            align-items: flex-start;
             padding-top: 20px;
-        }}
+        }
     </style>
     """
 
     # --- 현재 카드 데이터 가져오기 ---
     current_group = st.session_state.study_groups[current_index]
+    main_word = current_group['main']
+    synonyms = current_group['synonyms']
 
-    # --- 카드 앞면 내용 (단어) ---
-    front_content = f"<h1 style='color: steelblue;'>{current_group['main']}</h1>"
+    # --- 카드 뒷면 HTML 생성 ---
+    synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in synonyms)
 
-    # --- 카드 뒷면 내용 (유의어) ---
-    synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in current_group['synonyms'])
-    back_content = f"""
-    <div style='height: 100%; width: 80%; overflow-y: auto;'>
-        <ul style='list-style-position: inside; padding-left: 10%;'>
-            {synonyms_html_list}
-        </ul>
-    </div>
-    """
-
-    # --- 클릭 가능한 플래시카드 HTML 구성 ---
+    # --- 카드의 뒤집힘 상태에 따라 CSS 클래스 적용 ---
     flip_class = "is-flipped" if st.session_state.card_flipped else ""
-    unique_card_id = f"card-click-area-{current_index}"
 
+    # --- 최종 HTML 컨텐츠: CSS와 카드 구조를 하나로 합침 ---
+    # 오류를 유발했던 주석을 제거했습니다.
     html_content = f"""
-    {card_flip_css}
-    <div class="card-container" id="{unique_card_id}">
-        <div class="card {flip_class}">
-            <div class="card-face card-front">{front_content}</div>
-            <div class="card-face card-back">{back_content}</div>
+    {card_css}
+    <a href='#' id='card-link-{current_index}' style='text-decoration: none; color: inherit;'>
+        <div class="card-container">
+            <div class="card-flipper {flip_class}">
+                <div class="card-face card-front">
+                    <h1 style='color: steelblue;'>{main_word}</h1>
+                </div>
+                <div class="card-face card-back">
+                    <div style='height: 100%; width: 80%; overflow-y: auto;'>
+                        <ul style='list-style-position: inside; padding-left: 10%;'>
+                            {synonyms_html_list}
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+    </a>
     """
 
-    # --- HTML을 렌더링하고 클릭 감지 ---
-    # st.markdown을 사용하여 HTML/CSS 렌더링
-    st.markdown(html_content, unsafe_allow_html=True)
-    
-    # st_click_detector는 보이지 않는 영역을 만들어 클릭을 감지하는 용도로만 사용
-    # key를 고유하게 만들어 각 카드마다 다른 감지기를 사용
-    clicked = click_detector(f'<div style="cursor: pointer; width: 100%; height: 250px; position: absolute; top: 0; left: 0;"></div>', key=f"detector_{current_index}")
-
+    # --- 통합된 HTML로 클릭 감지 ---
+    clicked = click_detector(html_content, key=f"detector_{current_index}")
 
     if clicked:
-        # 클릭이 감지되면 카드 상태를 뒤집고 스크립트를 한번만 재실행
+        # 클릭 시, 뒤집힘 상태를 변경하고 앱을 다시 실행하여 화면 갱신
         st.session_state.card_flipped = not st.session_state.card_flipped
         st.rerun()
 
