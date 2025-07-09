@@ -4,3 +4,4 @@ numpy
 notion-client
 nltk
 st-click-detector
+gTTS
