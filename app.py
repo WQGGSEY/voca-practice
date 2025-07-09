@@ -7,7 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
-from streamlit_extras.card import card
+from st_click_detector import st_click_detector
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -281,7 +281,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             else:
                 st.error(f"요청하신 {num_q_input}개의 문제를 생성하지 못했습니다 (생성된 문제: {len(questions)}개). Notion DB의 단어 수를 늘리거나 난이도를 낮춰보세요.")
 
-# --- 암기 모드 (streamlit-extras 적용 최종본) ---
+# --- 암기 모드 (st-click-detector 최종본) ---
 elif app_mode == "📖 암기 모드 (Study Mode)":
     st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
     st.info(f"총 {len(synonym_groups)}개의 단어가 있습니다. 카드를 클릭하면 유의어를 확인할 수 있습니다. 🖱️")
@@ -330,17 +330,34 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
 
     # --- 클릭 가능한 플래시카드 UI ---
     current_group = st.session_state.study_groups[current_index]
-
-    # 1. 카드에 표시할 내용을 flip 상태에 따라 미리 준비합니다.
-    card_body_content = ""
+    
+    card_style = """
+        width: 100%;
+        height: 250px;
+        border: 1px solid #e6e6e6;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: box-shadow 0.2s;
+    """
+    
+    html_content = ""
+    
     if not st.session_state.card_flipped:
-        # 카드 앞면
-        card_body_content = f"<div style='height: 200px; display: flex; align-items: center; justify-content: center;'><h1 style='text-align: center; color: steelblue;'>{current_group['main']}</h1></div>"
+        html_content = f"""
+        <div id="card_front" style="{card_style}">
+            <h1 style='color: steelblue;'>{current_group['main']}</h1>
+        </div>
+        """
     else:
-        # 카드 뒷면
         synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in current_group['synonyms'])
-        card_body_content = f"""
-        <div style='height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center;'>
+        html_content = f"""
+        <div id="card_back" style="{card_style} justify-content: start; padding-top: 20px;">
             <div style='height: 100%; width: 80%; overflow-y: auto;'>
                 <ul style='list-style-position: inside; padding-left: 10%;'>
                     {synonyms_html_list}
@@ -348,20 +365,10 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
             </div>
         </div>
         """
+    
+    # st_click_detector를 사용하여 HTML을 렌더링하고 클릭을 감지합니다.
+    clicked = st_click_detector(html_content, key=f"card_{current_index}")
 
-    # 2. card 함수를 호출하고, on_click 핸들러로 flip 상태를 변경합니다.
-    # 'with' 구문 없이 호출하는 것이 올바른 사용법입니다.
-    card(
-        title="",  # 제목은 사용하지 않음
-        text=card_body_content,  # 위에서 만든 HTML 컨텐츠를 전달
-        styles={
-            "card": {
-                "width": "100%",
-                "height": "250px",
-                "box-shadow": "0 4px 6px rgba(0,0,0,0.1)",
-            },
-            "title": {"display": "none"},
-            "text": {"margin": "0", "padding": "0"}
-        },
-        on_click=lambda: setattr(st.session_state, 'card_flipped', not st.session_state.card_flipped)
-    )
+    if clicked:
+        st.session_state.card_flipped = not st.session_state.card_flipped
+        st.rerun()
