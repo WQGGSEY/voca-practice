@@ -3,7 +3,6 @@ import random
 import pandas as pd
 import numpy as np
 from notion_client import Client
-from dotenv import load_dotenv
 from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
