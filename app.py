@@ -1,5 +1,6 @@
 import os
 import random
+import time  # 👈 [NEW] time.sleep()을 사용하기 위해 임포트
 import pandas as pd
 import numpy as np
 from notion_client import Client
@@ -8,8 +9,8 @@ import nltk
 from nltk.corpus import wordnet
 import streamlit as st
 from st_click_detector import click_detector
-from gtts import gTTS # 👈 [NEW] gTTS 라이브러리 임포트
-from io import BytesIO # 👈 [NEW] 인메모리 바이트 처리를 위한 BytesIO 임포트
+from gtts import gTTS
+from io import BytesIO
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -21,7 +22,6 @@ def download_nltk_data():
     except LookupError:
         nltk.download('wordnet')
 download_nltk_data()
-
 
 # --- 1. 데이터 로딩 및 전처리, TTS 함수 ---
 
@@ -88,11 +88,9 @@ def get_synset(word):
         return wordnet.synsets(word)[0]
     except IndexError:
         return None
-        
-# 👈 [NEW] 텍스트를 음성(mp3 바이트)으로 변환하는 함수
+
 @st.cache_data
 def text_to_speech(text: str) -> bytes | None:
-    """gTTS를 사용하여 텍스트를 mp3 오디오 바이트로 변환합니다."""
     try:
         tts = gTTS(text=text, lang='en')
         fp = BytesIO()
@@ -103,7 +101,7 @@ def text_to_speech(text: str) -> bytes | None:
         st.error(f"음성 변환 중 오류 발생: {e}")
         return None
 
-# --- 2. 퀴즈 문제 생성 로직 --- (기존과 동일)
+# --- 2. 퀴즈 문제 생성 로직 (기존과 동일) ---
 def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_threshold=0.6):
     questions = []
     if not groups: return []
@@ -145,7 +143,6 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
         })
     return questions
 
-
 # --- 3. Streamlit UI 구성 ---
 
 NOTION_TOKEN = st.secrets["NOTION_TOKEN"]
@@ -168,9 +165,9 @@ if df is None or df.empty:
     st.warning("Notion에서 데이터를 불러오지 못했거나 데이터베이스가 비어 있습니다.")
     st.stop()
 
-
-# --- 퀴즈 모드 --- (기존과 동일)
+# --- 퀴즈 모드 (기존과 동일) ---
 if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
+    # ... (퀴즈 모드 코드는 변경 없음) ...
     st.title("✍️ TOEFL VOCA TEST")
 
     if 'test_started' not in st.session_state:
@@ -276,26 +273,29 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
     st.info(f"총 {len(synonym_groups)}개의 단어가 있습니다. 카드를 클릭하면 유의어를 확인할 수 있습니다. 🖱️")
 
+    # 👈 [MODIFIED] 세션 상태 초기화 강화
     if 'study_groups' not in st.session_state:
         st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
         st.session_state.card_index = 0
         st.session_state.card_flipped = False
+        st.session_state.is_playing = False # 재생 상태 추가
 
     if not st.session_state.study_groups:
         st.warning("학습할 단어가 없습니다.")
         st.stop()
 
+    # 👈 [NEW] 재생 중지 함수: 다른 버튼 클릭 시 재생을 멈추기 위함
+    def stop_playing():
+        st.session_state.is_playing = False
+
     total_cards = len(st.session_state.study_groups)
     current_index = st.session_state.card_index
-    current_group = st.session_state.study_groups[current_index]
-    main_word = current_group['main']
-    synonyms = current_group['synonyms']
 
-    # 👈 [MODIFIED] 컨트롤러 UI 레이아웃 수정 (재생 버튼 공간 추가)
-    col1, col2, col3, col4, col5 = st.columns([1.5, 1.5, 1.5, 5, 1.5])
+    col1, col2, col3, col4, col5 = st.columns([1.5, 1.5, 2.0, 5, 1.5])
 
     with col1:
         if st.button("⬅️ 이전", use_container_width=True):
+            stop_playing() # 재생 중지
             if current_index > 0:
                 st.session_state.card_index -= 1
                 st.session_state.card_flipped = False
@@ -303,45 +303,46 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
 
     with col2:
         if st.button("다음 ➡️", use_container_width=True):
+            stop_playing() # 재생 중지
             if current_index < total_cards - 1:
                 st.session_state.card_index += 1
                 st.session_state.card_flipped = False
                 st.rerun()
 
-    # 👈 [NEW] 재생 버튼과 로직 추가
+    # 👈 [MODIFIED] 재생/일시정지 토글 버튼 로직
     with col3:
-        if st.button("▶️ 재생", use_container_width=True):
-            # 읽을 텍스트 생성: "단어. 유의어는: 유의어1, 유의어2, ..."
-            text_to_read = f"{main_word}. Synonyms are: {', '.join(synonyms)}"
-            
-            with st.spinner("🔊 음성 생성 중..."):
-                audio_bytes = text_to_speech(text_to_read)
-                if audio_bytes:
-                    # st.audio를 플레이스홀더 외부에서 호출하여 재생
-                    st.session_state.audio_to_play = audio_bytes
-                else:
-                    st.error("음성 파일을 생성하지 못했습니다.")
-    
+        # 재생 중일 때는 '일시정지' 버튼을, 아닐 때는 '전체 재생' 버튼을 보여줌
+        if st.session_state.is_playing:
+            if st.button("⏸️ 일시정지", use_container_width=True):
+                stop_playing()
+                st.rerun()
+        else:
+            if st.button("▶️ 전체 재생", use_container_width=True):
+                st.session_state.is_playing = True
+                st.rerun()
+
     with col4:
-        st.progress((current_index + 1) / total_cards, text=f"Card {current_index + 1} / {total_cards}")
+        # 재생 중일 때는 어떤 단어를 읽고 있는지 표시
+        progress_text = f"Playing: {st.session_state.study_groups[current_index]['main']}" if st.session_state.is_playing else f"Card {current_index + 1} / {total_cards}"
+        st.progress((current_index + 1) / total_cards, text=progress_text)
 
     with col5:
         if st.button("🔄 셔플", use_container_width=True):
+            stop_playing() # 재생 중지
             st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
             st.session_state.card_index = 0
             st.session_state.card_flipped = False
             st.rerun()
-            
-    # 👈 [NEW] st.audio를 버튼 클릭 시 바로 렌더링하도록 처리
-    if 'audio_to_play' in st.session_state and st.session_state.audio_to_play:
-        st.audio(st.session_state.audio_to_play, format="audio/mp3")
-        # 한 번 재생 후에는 상태를 초기화하여 반복 재생 방지
-        st.session_state.audio_to_play = None
-
 
     st.divider()
 
-    # --- 카드 UI (기존과 동일)
+    # 오디오 플레이어를 위한 보이지 않는 공간
+    audio_placeholder = st.empty()
+
+    # --- 카드 UI (기존과 동일) ---
+    current_group = st.session_state.study_groups[current_index]
+    main_word = current_group['main']
+    synonyms = current_group['synonyms']
     card_css = """
     <style>
         .card-container { width: 100%; height: 250px; perspective: 1000px; }
@@ -360,7 +361,7 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         <div class="card-container">
             <div class="card-flipper {flip_class}">
                 <div class="card-face card-front"><h1 style='color: steelblue;'>{main_word}</h1></div>
-                <div class="card-face card-back">
+                <div class.card-face card-back">
                     <div style='height: 100%; width: 80%; overflow-y: auto;'>
                         <ul style='list-style-position: inside; padding-left: 10%;'>{synonyms_html_list}</ul>
                     </div>
@@ -369,7 +370,49 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         </div>
     </a>
     """
-    clicked = click_detector(html_content, key=f"detector_{current_index}")
-    if clicked:
-        st.session_state.card_flipped = not st.session_state.card_flipped
-        st.rerun()
+    # 재생 중에는 카드 클릭(뒤집기) 방지
+    if not st.session_state.is_playing:
+        clicked = click_detector(html_content, key=f"detector_{current_index}")
+        if clicked:
+            st.session_state.card_flipped = not st.session_state.card_flipped
+            st.rerun()
+    else:
+        # 재생 중일 때는 클릭 감지기 없이 HTML만 렌더링
+        st.markdown(html_content, unsafe_allow_html=True)
+
+
+    # 👈 [NEW] 전체 순회 재생을 위한 핵심 로직
+    # 이 로직은 스크립트의 맨 마지막에 위치하여 다른 UI가 모두 렌더링된 후 실행됩니다.
+    if st.session_state.is_playing:
+        # 현재 인덱스가 유효한 범위 내에 있는지 확인
+        if current_index < total_cards:
+            # 읽을 텍스트 생성
+            text_to_read = f"{main_word}. Synonyms are: {', '.join(synonyms)}"
+            
+            # 음성 데이터 생성
+            audio_bytes = text_to_speech(text_to_read)
+
+            if audio_bytes:
+                # 보이지 않는 플레이스홀더에 자동 재생 오디오를 렌더링
+                audio_placeholder.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                
+                # 다음 단어로 인덱스 이동
+                st.session_state.card_index += 1
+                
+                # 오디오가 재생될 시간을 주기 위해 짧게 대기
+                # (이 값을 조절하여 재생 속도를 바꿀 수 있습니다)
+                time.sleep(1.5)
+
+                # 다음 단어 재생을 위해 스크립트를 다시 실행
+                st.rerun()
+            else:
+                # 음성 생성 실패 시 재생 중지
+                st.error("음성 파일을 생성하지 못했습니다. 재생을 중지합니다.")
+                stop_playing()
+                st.rerun()
+        else:
+            # 모든 단어 재생 완료 시
+            st.toast("✅ 모든 단어 학습을 완료했습니다!", icon="🎉")
+            st.session_state.card_index = 0  # 인덱스를 처음으로 리셋
+            stop_playing()
+            st.rerun()
