@@ -7,7 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
-from st_click_detector import click_detector # 👈 수정된 부분
+from st_click_detector import click_detector
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -252,7 +252,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
         st.header("⚙️ 테스트 설정")
         max_q = len(synonym_groups)
         num_q_input = st.number_input(
-            "풀고 싶은 문제 수를 입력하세요:", min_value=5, max_value=max_q, 
+            "풀고 싶은 문제 수를 입력하세요:", min_value=5, max_value=max_q,
             value=min(25, max_q), step=1
         )
         
@@ -306,7 +306,7 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         if st.button("⬅️ 이전", use_container_width=True):
             if current_index > 0:
                 st.session_state.card_index -= 1
-                st.session_state.card_flipped = False 
+                st.session_state.card_flipped = False
                 st.rerun()
 
     with col2:
@@ -344,32 +344,34 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         cursor: pointer;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         transition: box-shadow 0.2s;
+        text-decoration: none; /* 링크 밑줄 제거 */
+        color: inherit; /* 링크 색상 상속 */
     """
     
-    html_content = ""
-    
+    # ⭐️⭐️⭐️ 수정된 핵심 부분 시작 ⭐️⭐️⭐️
+    unique_card_id = f"card-{'front' if not st.session_state.card_flipped else 'back'}-{current_index}"
+
+    html_content = f"<a href='#' id='{unique_card_id}' style='{card_style}'>"
+
     if not st.session_state.card_flipped:
-        html_content = f"""
-        <div id="card_front" style="{card_style}">
-            <h1 style='color: steelblue;'>{current_group['main']}</h1>
-        </div>
-        """
+        html_content += f"<h1 style='color: steelblue;'>{current_group['main']}</h1>"
     else:
         synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in current_group['synonyms'])
-        html_content = f"""
-        <div id="card_back" style="{card_style} justify-content: start; padding-top: 20px;">
-            <div style='height: 100%; width: 80%; overflow-y: auto;'>
-                <ul style='list-style-position: inside; padding-left: 10%;'>
-                    {synonyms_html_list}
-                </ul>
-            </div>
+        html_content += f"""
+        <div style='height: 100%; width: 80%; overflow-y: auto; padding-top: 20px;'>
+            <ul style='list-style-position: inside; padding-left: 10%;'>
+                {synonyms_html_list}
+            </ul>
         </div>
         """
+    html_content += "</a>"
+
+    # st_click_detector 대신 click_detector를 사용하고, id가 있는 a 태그를 포함한 html을 전달
+    clicked = click_detector(html_content, key=f"detector_{current_index}")
     
-    # st_click_detector를 사용하여 HTML을 렌더링하고 클릭을 감지합니다.
-    # 👈 수정된 부분
-    clicked = click_detector(html_content, key=f"card_{current_index}")
+    # ⭐️⭐️⭐️ 수정된 핵심 부분 끝 ⭐️⭐️⭐️
 
     if clicked:
+        # 클릭이 감지되면 카드 상태를 뒤집고 rerun
         st.session_state.card_flipped = not st.session_state.card_flipped
         st.rerun()
