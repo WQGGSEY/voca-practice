@@ -7,7 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
-from st_click_detector import st_click_detector
+from st_click_detector import click_detector # 👈 수정된 부분
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -367,7 +367,8 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         """
     
     # st_click_detector를 사용하여 HTML을 렌더링하고 클릭을 감지합니다.
-    clicked = st_click_detector(html_content, key=f"card_{current_index}")
+    # 👈 수정된 부분
+    clicked = click_detector(html_content, key=f"card_{current_index}")
 
     if clicked:
         st.session_state.card_flipped = not st.session_state.card_flipped
