@@ -7,7 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
-import st_click_detector # 라이브러리 import
+from st_click_detector import st_click_detector
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -281,7 +281,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             else:
                 st.error(f"요청하신 {num_q_input}개의 문제를 생성하지 못했습니다 (생성된 문제: {len(questions)}개). Notion DB의 단어 수를 늘리거나 난이도를 낮춰보세요.")
 
-# --- 암기 모드 (카드 클릭으로 뒤집기 기능 추가) ---
+# --- 암기 모드 (최종 수정본) ---
 elif app_mode == "📖 암기 모드 (Study Mode)":
     st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
     st.info(f"총 {len(synonym_groups)}개의 단어가 있습니다. 카드를 클릭하면 유의어를 확인할 수 있습니다. 🖱️")
@@ -331,7 +331,6 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     # --- 클릭 가능한 플래시카드 UI ---
     current_group = st.session_state.study_groups[current_index]
     
-    # 카드 스타일 정의 (클릭 가능하게 보이도록 cursor: pointer 추가)
     card_style = """
         width: 100%;
         height: 250px;
@@ -347,19 +346,15 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         transition: box-shadow 0.2s;
     """
     
-    # HTML 컨텐츠를 담을 변수
     html_content = ""
     
-    # 카드 뒤집힘 상태에 따라 다른 HTML 컨텐츠 생성
     if not st.session_state.card_flipped:
-        # 카드 앞면 (단어)
         html_content = f"""
         <div style="{card_style}">
             <h1 style='color: steelblue;'>{current_group['main']}</h1>
         </div>
         """
     else:
-        # 카드 뒷면 (유의어) - 'Synonyms' 텍스트 제거
         synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in current_group['synonyms'])
         html_content = f"""
         <div style="{card_style} justify-content: start; padding-top: 20px;">
@@ -371,10 +366,9 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         </div>
         """
     
-    # st_click_detector를 사용하여 HTML을 렌더링하고 클릭 감지
-    clicked_card_id = st_click_detector(html_content)
+    # key 값을 추가하여 위젯의 고유성을 보장합니다.
+    clicked_card_id = st_click_detector(html_content, key=f"card_{current_index}")
 
-    # 카드가 클릭되면 (ID가 반환되면), 뒤집힘 상태를 변경하고 rerun
     if clicked_card_id:
         st.session_state.card_flipped = not st.session_state.card_flipped
         st.rerun()
