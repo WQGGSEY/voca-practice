@@ -7,6 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
+from st_click_detector import st_click_detector # 라이브러리 import
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -280,17 +281,13 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             else:
                 st.error(f"요청하신 {num_q_input}개의 문제를 생성하지 못했습니다 (생성된 문제: {len(questions)}개). Notion DB의 단어 수를 늘리거나 난이도를 낮춰보세요.")
 
-# --- 암기 모드 (Quizlet 스타일로 변경) ---
+# --- 암기 모드 (카드 클릭으로 뒤집기 기능 추가) ---
 elif app_mode == "📖 암기 모드 (Study Mode)":
     st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
-    st.success(f"총 {len(synonym_groups)}개의 단어 그룹을 학습할 수 있습니다. 카드를 클릭하여 유의어를 확인하세요!")
+    st.info(f"총 {len(synonym_groups)}개의 단어가 있습니다. 카드를 클릭하면 유의어를 확인할 수 있습니다. 🖱️")
 
     # --- Session State 초기화 ---
-    # study_groups: 현재 학습 중인 단어 목록 (셔플 가능)
-    # card_index: 현재 보고 있는 카드의 인덱스
-    # card_flipped: 현재 카드가 뒤집혔는지 여부
     if 'study_groups' not in st.session_state:
-        # 처음 시작 시 단어 목록을 복사하고 섞음
         st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
         st.session_state.card_index = 0
         st.session_state.card_flipped = False
@@ -309,23 +306,21 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         if st.button("⬅️ 이전", use_container_width=True):
             if current_index > 0:
                 st.session_state.card_index -= 1
-                st.session_state.card_flipped = False # 새 카드로 넘어가면 다시 앞면으로
+                st.session_state.card_flipped = False 
                 st.rerun()
 
     with col2:
         if st.button("다음 ➡️", use_container_width=True):
             if current_index < total_cards - 1:
                 st.session_state.card_index += 1
-                st.session_state.card_flipped = False # 새 카드로 넘어가면 다시 앞면으로
+                st.session_state.card_flipped = False
                 st.rerun()
 
     with col3:
-        # 진행도 바
         st.progress((current_index + 1) / total_cards, text=f"Card {current_index + 1} / {total_cards}")
 
     with col4:
         if st.button("🔄 셔플", use_container_width=True):
-            # 목록을 다시 섞고 처음으로 돌아감
             st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
             st.session_state.card_index = 0
             st.session_state.card_flipped = False
@@ -333,29 +328,53 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
 
     st.divider()
 
-    # --- 플래시카드 UI ---
+    # --- 클릭 가능한 플래시카드 UI ---
     current_group = st.session_state.study_groups[current_index]
     
-    # 카드를 담을 컨테이너 생성
-    card_container = st.empty()
-
-    # 카드 클릭(뒤집기) 로직
-    # st.button을 보이지 않게 처리하고, div로 감싸서 클릭 이벤트를 모방하기는 복잡함
-    # 대신 명시적인 "Flip" 버튼을 사용하거나, 컨테이너 자체를 버튼처럼 활용
-    # 여기서는 간단하게 st.container와 그 안의 내용으로 표현
+    # 카드 스타일 정의 (클릭 가능하게 보이도록 cursor: pointer 추가)
+    card_style = """
+        width: 100%;
+        height: 250px;
+        border: 1px solid #e6e6e6;
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: box-shadow 0.2s;
+    """
     
-    with card_container.container(border=True):
-        # 카드 뒤집힘 상태에 따라 다른 내용 표시
-        if not st.session_state.card_flipped:
-            # 카드 앞면 (단어)
-            st.markdown(f"<div style='height: 200px; display: flex; align-items: center; justify-content: center;'><h1 style='text-align: center; color: steelblue;'>{current_group['main']}</h1></div>", unsafe_allow_html=True)
-        else:
-            # 카드 뒷면 (유의어)
-            st.markdown("<h3 style='text-align: center;'>Synonyms</h3>", unsafe_allow_html=True)
-            synonyms_html_list = "".join(f"<li style='text-align: left;'><code>{s}</code></li>" for s in current_group['synonyms'])
-            st.markdown(f"<div style='height: 150px; overflow-y: auto; padding-left: 30%;'><ul style='list-style-position: inside;'>{synonyms_html_list}</ul></div>", unsafe_allow_html=True)
+    # HTML 컨텐츠를 담을 변수
+    html_content = ""
+    
+    # 카드 뒤집힘 상태에 따라 다른 HTML 컨텐츠 생성
+    if not st.session_state.card_flipped:
+        # 카드 앞면 (단어)
+        html_content = f"""
+        <div style="{card_style}">
+            <h1 style='color: steelblue;'>{current_group['main']}</h1>
+        </div>
+        """
+    else:
+        # 카드 뒷면 (유의어) - 'Synonyms' 텍스트 제거
+        synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in current_group['synonyms'])
+        html_content = f"""
+        <div style="{card_style} justify-content: start; padding-top: 20px;">
+            <div style='height: 100%; width: 80%; overflow-y: auto;'>
+                <ul style='list-style-position: inside; padding-left: 10%;'>
+                    {synonyms_html_list}
+                </ul>
+            </div>
+        </div>
+        """
+    
+    # st_click_detector를 사용하여 HTML을 렌더링하고 클릭 감지
+    clicked_card_id = st_click_detector(html_content)
 
-    # 카드 뒤집기 버튼
-    if st.button("🔀 카드 뒤집기", use_container_width=True, type="primary"):
+    # 카드가 클릭되면 (ID가 반환되면), 뒤집힘 상태를 변경하고 rerun
+    if clicked_card_id:
         st.session_state.card_flipped = not st.session_state.card_flipped
         st.rerun()

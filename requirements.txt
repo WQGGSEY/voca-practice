@@ -3,3 +3,4 @@ pandas
 numpy
 notion-client
 nltk  # <--- 이 부분이 반드시 있어야 합니다.
+st-click-detector
