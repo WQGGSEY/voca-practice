@@ -148,7 +148,6 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
 # --- 3. Streamlit UI 구성 ---
 
 # .env 파일에서 환경 변수 로드
-load_dotenv()
 NOTION_TOKEN = st.secrets["NOTION_TOKEN"]
 DATABASE_ID = st.secrets["DATABASE_ID"]
 
