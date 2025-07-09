@@ -7,7 +7,7 @@ from datetime import datetime
 import nltk
 from nltk.corpus import wordnet
 import streamlit as st
-from st_click_detector import st_click_detector
+import st_click_detector # ⭐️ 1. import 구문을 수정합니다.
 
 # --- 0. 페이지 설정 및 NLTK 데이터 다운로드 ---
 st.set_page_config(page_title="VOCA Master", page_icon="📚", layout="centered")
@@ -366,8 +366,8 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         </div>
         """
     
-    # key 값을 추가하여 위젯의 고유성을 보장합니다.
-    clicked_card_id = st_click_detector(html_content, key=f"card_{current_index}")
+    # ⭐️ 2. 함수 호출 방식을 '라이브러리.함수()' 형태로 수정합니다.
+    clicked_card_id = st_click_detector.st_click_detector(html_content, key=f"card_{current_index}")
 
     if clicked_card_id:
         st.session_state.card_flipped = not st.session_state.card_flipped
