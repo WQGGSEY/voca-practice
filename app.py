@@ -328,7 +328,6 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
 
     st.divider()
 
-
     # ⭐️⭐️⭐️ 수정된 핵심 부분 시작 ⭐️⭐️⭐️
 
     # --- 카드 뒤집기 애니메이션을 위한 CSS ---
@@ -382,7 +381,6 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     flip_class = "is-flipped" if st.session_state.card_flipped else ""
 
     # --- 최종 HTML 컨텐츠: CSS와 카드 구조를 하나로 합침 ---
-    # 오류를 유발했던 주석을 제거했습니다.
     html_content = f"""
     {card_css}
     <a href='#' id='card-link-{current_index}' style='text-decoration: none; color: inherit;'>
@@ -407,8 +405,9 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     clicked = click_detector(html_content, key=f"detector_{current_index}")
 
     if clicked:
-        # 클릭 시, 뒤집힘 상태를 변경하고 앱을 다시 실행하여 화면 갱신
+        # 클릭 시, 뒤집힘 상태를 변경하기만 함
+        # Streamlit이 session_state의 변경을 감지하고 자동으로 앱을 재실행
         st.session_state.card_flipped = not st.session_state.card_flipped
-        st.rerun()
+        # st.rerun() # 👈 무한 루프를 유발하는 이 부분을 제거!
 
     # ⭐️⭐️⭐️ 수정된 핵심 부분 끝 ⭐️⭐️⭐️
