@@ -23,9 +23,8 @@ download_nltk_data()
 
 # --- 1. 데이터 로딩 및 전처리 함수 ---
 
-@st.cache_data(ttl=600) # 10분 동안 캐시 유지
+@st.cache_data(ttl=600)
 def get_db_as_dataframe(database_id: str, token: str) -> pd.DataFrame | None:
-    """Notion DB를 쿼리하여 DataFrame으로 변환합니다."""
     notion = Client(auth=token)
     try:
         response = notion.databases.query(database_id=database_id)
@@ -60,7 +59,6 @@ def get_db_as_dataframe(database_id: str, token: str) -> pd.DataFrame | None:
 
 @st.cache_data
 def create_synonym_groups(df: pd.DataFrame, decay_const: float = 0.023) -> list[dict]:
-    """DataFrame에서 유의어 그룹과 시간 가중치를 생성합니다."""
     if df is None or not all(col in df.columns for col in ['word', 'Synonyms', 'last_edited_time']):
         return []
 
@@ -84,7 +82,6 @@ def create_synonym_groups(df: pd.DataFrame, decay_const: float = 0.023) -> list[
     return structured_groups
 
 def get_synset(word):
-    """WordNet에서 단어의 synset을 가져옵니다."""
     try:
         return wordnet.synsets(word)[0]
     except IndexError:
@@ -92,7 +89,6 @@ def get_synset(word):
 
 # --- 2. 퀴즈 문제 생성 로직 ---
 def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_threshold=0.6):
-    """지정된 개수만큼 중복되지 않는 퀴즈 문제 리스트를 생성합니다."""
     questions = []
     if not groups: return []
 
@@ -104,23 +100,17 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
 
     while len(questions) < num_questions and attempts < max_attempts:
         attempts += 1
-
         correct_group = random.choices(groups, weights=weights, k=1)[0]
-
         if random.random() < 0.8:
             question_word, answer_word = correct_group['main'], random.choice(correct_group['synonyms'])
         else:
             question_word, answer_word = random.choice(correct_group['synonyms']), correct_group['main']
-
         if question_word in used_question_words: continue
-
         question_synset = get_synset(question_word)
         if not question_synset: continue
-
         distractors = []
         candidate_pool = [w for w in all_words if w not in correct_group['main'] and w not in correct_group['synonyms']]
         random.shuffle(candidate_pool)
-
         for candidate in candidate_pool:
             if len(distractors) == 3: break
             candidate_synset = get_synset(candidate)
@@ -128,30 +118,23 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
                 similarity = question_synset.wup_similarity(candidate_synset)
                 if similarity is not None and similarity < similarity_threshold:
                     distractors.append(candidate)
-
         if len(distractors) < 3: continue
-
         used_question_words.add(question_word)
-
         options = [answer_word] + distractors
         random.shuffle(options)
         options.append("I don't know.")
-
         questions.append({
             "question_word": question_word,
             "options": options,
             "answer": answer_word
         })
-
     return questions
 
 # --- 3. Streamlit UI 구성 ---
 
-# .env 파일에서 환경 변수 로드
 NOTION_TOKEN = st.secrets["NOTION_TOKEN"]
 DATABASE_ID = st.secrets["DATABASE_ID"]
 
-# --- 사이드바 메뉴 ---
 st.sidebar.title("MENU")
 app_mode = st.sidebar.radio(
     "모드를 선택하세요",
@@ -162,7 +145,6 @@ if not (NOTION_TOKEN and DATABASE_ID):
     st.error("`.env` 파일에 `NOTION_TOKEN`과 `DB_ID`를 설정해주세요.")
     st.stop()
 
-# --- 데이터 로딩 (모든 모드에서 공통으로 사용) ---
 df = get_db_as_dataframe(DATABASE_ID, NOTION_TOKEN)
 synonym_groups = create_synonym_groups(df)
 
@@ -172,13 +154,13 @@ if df is None or df.empty:
 
 # --- 퀴즈 모드 ---
 if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
+    # ... (퀴즈 모드 코드는 변경 없음) ...
     st.title("✍️ TOEFL VOCA TEST")
 
     if 'test_started' not in st.session_state:
         st.session_state.test_started = False
 
     if st.session_state.test_started:
-        # --- 테스트 진행 화면 ---
         current_q_index = st.session_state.current_q
         total_questions = len(st.session_state.questions)
         if current_q_index < total_questions:
@@ -200,13 +182,11 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
                 else:
                     st.warning("답을 선택해주세요!")
         else:
-            # --- 테스트 결과 화면 ---
             st.header("✨ 테스트 결과")
             score = st.session_state.score
             st.metric(label="정답률", value=f"{score / total_questions:.2%}", delta=f"{score} / {total_questions} 문제")
             st.balloons()
 
-            # --- 틀린 문제 저장 ---
             if not st.session_state.get('result_saved', False):
                 incorrect_answers = []
                 for i, q_data in enumerate(st.session_state.questions):
@@ -216,7 +196,6 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
                             "문제 번호": i + 1, "문제 단어": q_data['question_word'],
                             "선택한 답": user_answer, "정답": q_data['answer']
                         })
-
                 if incorrect_answers:
                     result_df = pd.DataFrame(incorrect_answers)
                     result_dir = "result"
@@ -232,14 +211,12 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
                     st.success("🎉 모든 문제를 맞혔습니다! 저장할 오답이 없습니다.")
                 st.session_state.result_saved = True
 
-            # --- 문제 다시보기 ---
             st.subheader("📝 문제 다시보기")
             for i, q_data in enumerate(st.session_state.questions):
                 with st.expander(f"{'✅' if st.session_state.user_answers.get(i) == q_data['answer'] else '❌'} Q{i+1}. '{q_data['question_word']}'"):
                     st.markdown(f"**- 선택한 답:** `{st.session_state.user_answers.get(i, '답변 안 함')}`")
                     if st.session_state.user_answers.get(i) != q_data['answer']:
                         st.markdown(f"**- 정답:** `{q_data['answer']}`")
-
             if st.button("새로운 퀴즈 시작하기"):
                 st.session_state.test_started = False
                 st.session_state.pop('questions', None)
@@ -247,28 +224,14 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
                 st.rerun()
 
     else:
-        # --- 테스트 시작 화면 ---
         st.header("⚙️ 테스트 설정")
         max_q = len(synonym_groups)
-        num_q_input = st.number_input(
-            "풀고 싶은 문제 수를 입력하세요:", min_value=5, max_value=max_q,
-            value=min(25, max_q), step=1
-        )
-
-        similarity_threshold = st.slider(
-            "오답 선택지 난이도 조절 (Similarity Threshold):",
-            min_value=0.1, max_value=0.9, value=0.6, step=0.05
-        )
-        st.info("""
-            **난이도 설명:** 이 값이 오답과 문제 단어의 의미적 유사도 임계값입니다.
-            - **값이 낮을수록 (Easy):** 오답이 문제와 관련 없는 단어로 구성되어 쉬워집니다.
-            - **값이 높을수록 (Hard):** 오답이 문제와 의미적으로 유사한 단어로 구성되어 어려워집니다.
-        """)
-
+        num_q_input = st.number_input("풀고 싶은 문제 수를 입력하세요:", min_value=5, max_value=max_q, value=min(25, max_q), step=1)
+        similarity_threshold = st.slider("오답 선택지 난이도 조절 (Similarity Threshold):", min_value=0.1, max_value=0.9, value=0.6, step=0.05)
+        st.info("""**난이도 설명:** 이 값이 오답과 문제 단어의 의미적 유사도 임계값입니다. - **값이 낮을수록 (Easy):** 오답이 문제와 관련 없는 단어로 구성되어 쉬워집니다. - **값이 높을수록 (Hard):** 오답이 문제와 의미적으로 유사한 단어로 구성되어 어려워집니다.""")
         if st.button("퀴즈 시작하기!", type="primary"):
             with st.spinner("유사도 기반으로 문제를 생성하는 중입니다..."):
                 questions = generate_quiz_questions(synonym_groups, num_q_input, similarity_threshold)
-
             if len(questions) >= num_q_input:
                 st.session_state.questions = questions
                 st.session_state.current_q = 0
@@ -280,12 +243,11 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             else:
                 st.error(f"요청하신 {num_q_input}개의 문제를 생성하지 못했습니다 (생성된 문제: {len(questions)}개). Notion DB의 단어 수를 늘리거나 난이도를 낮춰보세요.")
 
-# --- 암기 모드 (재생 기능 제거된 원래 버전) ---
+# --- 암기 모드 ---
 elif app_mode == "📖 암기 모드 (Study Mode)":
     st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
     st.info(f"총 {len(synonym_groups)}개의 단어가 있습니다. 카드를 클릭하면 유의어를 확인할 수 있습니다. 🖱️")
 
-    # --- Session State 초기화 ---
     if 'study_groups' not in st.session_state:
         st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
         st.session_state.card_index = 0
@@ -295,7 +257,6 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         st.warning("학습할 단어가 없습니다.")
         st.stop()
 
-    # --- 컨트롤러 UI (이전, 다음, 셔플, 진행도) ---
     total_cards = len(st.session_state.study_groups)
     current_index = st.session_state.card_index
 
@@ -327,57 +288,21 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
 
     st.divider()
 
-    # --- 카드 뒤집기 애니메이션을 위한 CSS ---
     card_css = """
     <style>
-        .card-container {
-            width: 100%;
-            height: 250px;
-            perspective: 1000px;
-        }
-        .card-flipper {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.6s;
-        }
-        .card-flipper.is-flipped {
-            transform: rotateY(180deg);
-        }
-        .card-face {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid #e6e6e6;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .card-back {
-            transform: rotateY(180deg);
-            align-items: flex-start;
-            padding-top: 20px;
-        }
+        .card-container { width: 100%; height: 250px; perspective: 1000px; }
+        .card-flipper { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s; }
+        .card-flipper.is-flipped { transform: rotateY(180deg); }
+        .card-face { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid #e6e6e6; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card-back { transform: rotateY(180deg); align-items: flex-start; padding-top: 20px; }
     </style>
     """
-
-    # --- 현재 카드 데이터 가져오기 ---
     current_group = st.session_state.study_groups[current_index]
     main_word = current_group['main']
     synonyms = current_group['synonyms']
-
-    # --- 카드 뒷면 HTML 생성 ---
     synonyms_html_list = "".join(f"<li style='text-align: left; margin: 5px 0;'><code style='font-size: 1.1rem;'>{s}</code></li>" for s in synonyms)
-
-    # --- 카드의 뒤집힘 상태에 따라 CSS 클래스 적용 ---
     flip_class = "is-flipped" if st.session_state.card_flipped else ""
 
-    # --- 최종 HTML 컨텐츠: CSS와 카드 구조를 하나로 합침 ---
     html_content = f"""
     {card_css}
     <a href='#' id='card-link-{current_index}' style='text-decoration: none; color: inherit;'>
@@ -388,20 +313,19 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
                 </div>
                 <div class="card-face card-back">
                     <div style='height: 100%; width: 80%; overflow-y: auto;'>
-                        <ul style='list-style-position: inside; padding-left: 10%;'>
-                            {synonyms_html_list}
-                        </ul>
+                        <ul style='list-style-position: inside; padding-left: 10%;'>{synonyms_html_list}</ul>
                     </div>
                 </div>
             </div>
         </div>
     </a>
     """
-
-    # --- 통합된 HTML로 클릭 감지 ---
+    
+    # 👈 [FIXED] 여기가 핵심적인 수정 부분입니다.
     clicked = click_detector(html_content, key=f"detector_{current_index}")
 
     if clicked:
-        # 클릭 시, 뒤집힘 상태를 변경하고 앱을 다시 실행하여 변경사항을 반영
+        # 클릭 시, 뒤집힘 상태를 변경하기만 합니다.
+        # st.rerun()을 호출하지 않아도, session_state가 변경되면 Streamlit이 자동으로 UI를 업데이트합니다.
         st.session_state.card_flipped = not st.session_state.card_flipped
-        st.rerun()
+        # st.rerun() # <--- 이 코드를 반드시 삭제해야 합니다.
