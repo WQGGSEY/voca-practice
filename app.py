@@ -280,28 +280,82 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             else:
                 st.error(f"요청하신 {num_q_input}개의 문제를 생성하지 못했습니다 (생성된 문제: {len(questions)}개). Notion DB의 단어 수를 늘리거나 난이도를 낮춰보세요.")
 
-# --- 암기 모드 ---
+# --- 암기 모드 (Quizlet 스타일로 변경) ---
 elif app_mode == "📖 암기 모드 (Study Mode)":
-    st.title("📖 TOEFL VOCA 암기장")
-    st.success(f"Notion에서 불러온 {len(synonym_groups)}개의 단어 그룹을 학습하세요.")
+    st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
+    st.success(f"총 {len(synonym_groups)}개의 단어 그룹을 학습할 수 있습니다. 카드를 클릭하여 유의어를 확인하세요!")
+
+    # --- Session State 초기화 ---
+    # study_groups: 현재 학습 중인 단어 목록 (셔플 가능)
+    # card_index: 현재 보고 있는 카드의 인덱스
+    # card_flipped: 현재 카드가 뒤집혔는지 여부
+    if 'study_groups' not in st.session_state:
+        # 처음 시작 시 단어 목록을 복사하고 섞음
+        st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
+        st.session_state.card_index = 0
+        st.session_state.card_flipped = False
+
+    if not st.session_state.study_groups:
+        st.warning("학습할 단어가 없습니다.")
+        st.stop()
+
+    # --- 컨트롤러 UI (이전, 다음, 셔플, 진행도) ---
+    total_cards = len(st.session_state.study_groups)
+    current_index = st.session_state.card_index
+
+    col1, col2, col3, col4 = st.columns([1.5, 1.5, 5, 1.5])
+
+    with col1:
+        if st.button("⬅️ 이전", use_container_width=True):
+            if current_index > 0:
+                st.session_state.card_index -= 1
+                st.session_state.card_flipped = False # 새 카드로 넘어가면 다시 앞면으로
+                st.rerun()
+
+    with col2:
+        if st.button("다음 ➡️", use_container_width=True):
+            if current_index < total_cards - 1:
+                st.session_state.card_index += 1
+                st.session_state.card_flipped = False # 새 카드로 넘어가면 다시 앞면으로
+                st.rerun()
+
+    with col3:
+        # 진행도 바
+        st.progress((current_index + 1) / total_cards, text=f"Card {current_index + 1} / {total_cards}")
+
+    with col4:
+        if st.button("🔄 셔플", use_container_width=True):
+            # 목록을 다시 섞고 처음으로 돌아감
+            st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
+            st.session_state.card_index = 0
+            st.session_state.card_flipped = False
+            st.rerun()
+
+    st.divider()
+
+    # --- 플래시카드 UI ---
+    current_group = st.session_state.study_groups[current_index]
     
-    search_term = st.text_input("검색할 단어를 입력하세요... (단어 또는 유의어)").lower()
+    # 카드를 담을 컨테이너 생성
+    card_container = st.empty()
 
-    if search_term:
-        filtered_groups = [
-            group for group in synonym_groups
-            if search_term in group['main'].lower() or any(search_term in s.lower() for s in group['synonyms'])
-        ]
-        st.info(f"'{search_term}'에 대한 검색 결과: {len(filtered_groups)}개")
-    else:
-        filtered_groups = synonym_groups
+    # 카드 클릭(뒤집기) 로직
+    # st.button을 보이지 않게 처리하고, div로 감싸서 클릭 이벤트를 모방하기는 복잡함
+    # 대신 명시적인 "Flip" 버튼을 사용하거나, 컨테이너 자체를 버튼처럼 활용
+    # 여기서는 간단하게 st.container와 그 안의 내용으로 표현
+    
+    with card_container.container(border=True):
+        # 카드 뒤집힘 상태에 따라 다른 내용 표시
+        if not st.session_state.card_flipped:
+            # 카드 앞면 (단어)
+            st.markdown(f"<div style='height: 200px; display: flex; align-items: center; justify-content: center;'><h1 style='text-align: center; color: steelblue;'>{current_group['main']}</h1></div>", unsafe_allow_html=True)
+        else:
+            # 카드 뒷면 (유의어)
+            st.markdown("<h3 style='text-align: center;'>Synonyms</h3>", unsafe_allow_html=True)
+            synonyms_html_list = "".join(f"<li style='text-align: left;'><code>{s}</code></li>" for s in current_group['synonyms'])
+            st.markdown(f"<div style='height: 150px; overflow-y: auto; padding-left: 30%;'><ul style='list-style-position: inside;'>{synonyms_html_list}</ul></div>", unsafe_allow_html=True)
 
-    if not filtered_groups:
-        st.warning("표시할 단어가 없습니다.")
-    else:
-        for group in filtered_groups:
-            with st.container():
-                st.markdown(f"### {group['main']}")
-                synonyms_text = ", ".join(f"`{s}`" for s in group['synonyms'])
-                st.markdown(f"**Synonyms:** {synonyms_text}")
-                st.divider()
+    # 카드 뒤집기 버튼
+    if st.button("🔀 카드 뒤집기", use_container_width=True, type="primary"):
+        st.session_state.card_flipped = not st.session_state.card_flipped
+        st.rerun()
