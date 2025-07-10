@@ -206,7 +206,7 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
         st.header("⚙️ 테스트 설정")
         max_q = len(synonym_groups)
         num_q_input = st.number_input("풀고 싶은 문제 수를 입력하세요:", min_value=5, max_value=max_q, value=min(25, max_q), step=1)
-        similarity_threshold = st.slider("오답 선택지 난이도 조절 (Similarity Threshold):", min_value=0.1, max_value=0.9, value=0.6, step=0.05)
+        similarity_threshold = st.slider("오답 선택지 난이도 조절 (Similarity Threshold):", min_value=0.1, max_value=0.9, value=0.2, step=0.05)
         st.info("""**난이도 설명:** 이 값이 오답과 문제 단어의 의미적 유사도 임계값입니다. - **값이 낮을수록 (Easy):** 오답이 문제와 관련 없는 단어로 구성되어 쉬워집니다. - **값이 높을수록 (Hard):** 오답이 문제와 의미적으로 유사한 단어로 구성되어 어려워집니다.""")
         if st.button("퀴즈 시작하기!", type="primary"):
             with st.spinner("유사도 기반으로 문제를 생성하는 중입니다..."):
