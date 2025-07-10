@@ -87,11 +87,10 @@ def get_synset(word):
     except IndexError:
         return None
 
-# --- 2. 퀴즈 문제 생성 로직 ---
+# --- 2. 퀴즈 문제 생성 로직 (변경 없음) ---
 def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_threshold=0.6):
     questions = []
     if not groups: return []
-
     weights = [g['weight'] for g in groups]
     all_words = list(set(w for group in groups for w in [group['main']] + group['synonyms']))
     used_question_words = set()
@@ -123,11 +122,7 @@ def generate_quiz_questions(groups: list[dict], num_questions: int, similarity_t
         options = [answer_word] + distractors
         random.shuffle(options)
         options.append("I don't know.")
-        questions.append({
-            "question_word": question_word,
-            "options": options,
-            "answer": answer_word
-        })
+        questions.append({"question_word": question_word, "options": options, "answer": answer_word})
     return questions
 
 # --- 3. Streamlit UI 구성 ---
@@ -136,10 +131,7 @@ NOTION_TOKEN = st.secrets["NOTION_TOKEN"]
 DATABASE_ID = st.secrets["DATABASE_ID"]
 
 st.sidebar.title("MENU")
-app_mode = st.sidebar.radio(
-    "모드를 선택하세요",
-    ["📖 암기 모드 (Study Mode)", "✍️ 퀴즈 모드 (Quiz Mode)"]
-)
+app_mode = st.sidebar.radio("모드를 선택하세요", ["📖 암기 모드 (Study Mode)", "✍️ 퀴즈 모드 (Quiz Mode)"])
 
 if not (NOTION_TOKEN and DATABASE_ID):
     st.error("`.env` 파일에 `NOTION_TOKEN`과 `DB_ID`를 설정해주세요.")
@@ -152,14 +144,11 @@ if df is None or df.empty:
     st.warning("Notion에서 데이터를 불러오지 못했거나 데이터베이스가 비어 있습니다.")
     st.stop()
 
-# --- 퀴즈 모드 ---
+# --- 퀴즈 모드 (변경 없음) ---
 if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
-    # ... (퀴즈 모드 코드는 변경 없음) ...
     st.title("✍️ TOEFL VOCA TEST")
-
     if 'test_started' not in st.session_state:
         st.session_state.test_started = False
-
     if st.session_state.test_started:
         current_q_index = st.session_state.current_q
         total_questions = len(st.session_state.questions)
@@ -168,7 +157,6 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             question_data = st.session_state.questions[current_q_index]
             st.subheader(f"Q: '{question_data['question_word']}'의 유의어는?")
             user_choice = st.radio("다음 중 정답을 고르세요:", options=question_data['options'], index=None, key=f"q_{current_q_index}")
-
             if st.button("확인", key=f"submit_{current_q_index}"):
                 if user_choice:
                     st.session_state.user_answers[current_q_index] = user_choice
@@ -186,31 +174,24 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             score = st.session_state.score
             st.metric(label="정답률", value=f"{score / total_questions:.2%}", delta=f"{score} / {total_questions} 문제")
             st.balloons()
-
             if not st.session_state.get('result_saved', False):
                 incorrect_answers = []
                 for i, q_data in enumerate(st.session_state.questions):
                     user_answer = st.session_state.user_answers.get(i, "N/A")
                     if user_answer != q_data['answer']:
-                        incorrect_answers.append({
-                            "문제 번호": i + 1, "문제 단어": q_data['question_word'],
-                            "선택한 답": user_answer, "정답": q_data['answer']
-                        })
+                        incorrect_answers.append({"문제 번호": i + 1, "문제 단어": q_data['question_word'], "선택한 답": user_answer, "정답": q_data['answer']})
                 if incorrect_answers:
                     result_df = pd.DataFrame(incorrect_answers)
-                    result_dir = "result"
-                    os.makedirs(result_dir, exist_ok=True)
+                    result_dir = "result"; os.makedirs(result_dir, exist_ok=True)
                     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"incorrect_answers_{timestamp_str}_{total_questions}q.txt"
                     filepath = os.path.join(result_dir, filename)
                     with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write("--- 오답 노트 ---\n\n")
-                        f.write(result_df.to_string(index=False))
+                        f.write("--- 오답 노트 ---\n\n"); f.write(result_df.to_string(index=False))
                     st.success(f"틀린 문제가 '{filepath}'에 저장되었습니다.")
                 else:
                     st.success("🎉 모든 문제를 맞혔습니다! 저장할 오답이 없습니다.")
                 st.session_state.result_saved = True
-
             st.subheader("📝 문제 다시보기")
             for i, q_data in enumerate(st.session_state.questions):
                 with st.expander(f"{'✅' if st.session_state.user_answers.get(i) == q_data['answer'] else '❌'} Q{i+1}. '{q_data['question_word']}'"):
@@ -219,10 +200,8 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
                         st.markdown(f"**- 정답:** `{q_data['answer']}`")
             if st.button("새로운 퀴즈 시작하기"):
                 st.session_state.test_started = False
-                st.session_state.pop('questions', None)
-                st.session_state.pop('result_saved', None)
+                st.session_state.pop('questions', None); st.session_state.pop('result_saved', None)
                 st.rerun()
-
     else:
         st.header("⚙️ 테스트 설정")
         max_q = len(synonym_groups)
@@ -233,12 +212,8 @@ if app_mode == "✍️ 퀴즈 모드 (Quiz Mode)":
             with st.spinner("유사도 기반으로 문제를 생성하는 중입니다..."):
                 questions = generate_quiz_questions(synonym_groups, num_q_input, similarity_threshold)
             if len(questions) >= num_q_input:
-                st.session_state.questions = questions
-                st.session_state.current_q = 0
-                st.session_state.score = 0
-                st.session_state.user_answers = {}
-                st.session_state.test_started = True
-                st.session_state.result_saved = False
+                st.session_state.questions = questions; st.session_state.current_q = 0; st.session_state.score = 0
+                st.session_state.user_answers = {}; st.session_state.test_started = True; st.session_state.result_saved = False
                 st.rerun()
             else:
                 st.error(f"요청하신 {num_q_input}개의 문제를 생성하지 못했습니다 (생성된 문제: {len(questions)}개). Notion DB의 단어 수를 늘리거나 난이도를 낮춰보세요.")
@@ -248,6 +223,7 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     st.title("📖 TOEFL VOCA 암기장 (Flashcard Mode)")
     st.info(f"총 {len(synonym_groups)}개의 단어가 있습니다. 카드를 클릭하면 유의어를 확인할 수 있습니다. 🖱️")
 
+    # --- Session State 초기화 ---
     if 'study_groups' not in st.session_state:
         st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
         st.session_state.card_index = 0
@@ -258,36 +234,45 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
         st.stop()
 
     total_cards = len(st.session_state.study_groups)
+
+    # 👈 [NEW] on_click에 연결할 콜백 함수들 정의
+    def go_to_next_card():
+        if st.session_state.card_index < total_cards - 1:
+            st.session_state.card_index += 1
+            st.session_state.card_flipped = False # 새 카드는 항상 앞면부터
+
+    def go_to_prev_card():
+        if st.session_state.card_index > 0:
+            st.session_state.card_index -= 1
+            st.session_state.card_flipped = False # 새 카드는 항상 앞면부터
+
+    def shuffle_cards():
+        st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
+        st.session_state.card_index = 0
+        st.session_state.card_flipped = False
+
+    # --- 컨트롤러 UI ---
+    col1, col2, col3, col4 = st.columns([1.5, 1.5, 5, 1.5])
     current_index = st.session_state.card_index
 
-    col1, col2, col3, col4 = st.columns([1.5, 1.5, 5, 1.5])
-
     with col1:
-        if st.button("⬅️ 이전", use_container_width=True):
-            if current_index > 0:
-                st.session_state.card_index -= 1
-                st.session_state.card_flipped = False
-                st.rerun()
+        # 👈 [MODIFIED] if문 대신 on_click 콜백 사용
+        st.button("⬅️ 이전", on_click=go_to_prev_card, use_container_width=True)
 
     with col2:
-        if st.button("다음 ➡️", use_container_width=True):
-            if current_index < total_cards - 1:
-                st.session_state.card_index += 1
-                st.session_state.card_flipped = False
-                st.rerun()
+        # 👈 [MODIFIED] if문 대신 on_click 콜백 사용
+        st.button("다음 ➡️", on_click=go_to_next_card, use_container_width=True)
 
     with col3:
         st.progress((current_index + 1) / total_cards, text=f"Card {current_index + 1} / {total_cards}")
 
     with col4:
-        if st.button("🔄 셔플", use_container_width=True):
-            st.session_state.study_groups = random.sample(synonym_groups, len(synonym_groups))
-            st.session_state.card_index = 0
-            st.session_state.card_flipped = False
-            st.rerun()
+        # 👈 [MODIFIED] if문 대신 on_click 콜백 사용
+        st.button("🔄 셔플", on_click=shuffle_cards, use_container_width=True)
 
     st.divider()
 
+    # --- 카드 UI 렌더링 ---
     card_css = """
     <style>
         .card-container { width: 100%; height: 250px; perspective: 1000px; }
@@ -308,9 +293,7 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     <a href='#' id='card-link-{current_index}' style='text-decoration: none; color: inherit;'>
         <div class="card-container">
             <div class="card-flipper {flip_class}">
-                <div class="card-face card-front">
-                    <h1 style='color: steelblue;'>{main_word}</h1>
-                </div>
+                <div class="card-face card-front"><h1 style='color: steelblue;'>{main_word}</h1></div>
                 <div class="card-face card-back">
                     <div style='height: 100%; width: 80%; overflow-y: auto;'>
                         <ul style='list-style-position: inside; padding-left: 10%;'>{synonyms_html_list}</ul>
@@ -321,11 +304,7 @@ elif app_mode == "📖 암기 모드 (Study Mode)":
     </a>
     """
     
-    # 👈 [FIXED] 여기가 핵심적인 수정 부분입니다.
     clicked = click_detector(html_content, key=f"detector_{current_index}")
 
     if clicked:
-        # 클릭 시, 뒤집힘 상태를 변경하기만 합니다.
-        # st.rerun()을 호출하지 않아도, session_state가 변경되면 Streamlit이 자동으로 UI를 업데이트합니다.
         st.session_state.card_flipped = not st.session_state.card_flipped
-        # st.rerun() # <--- 이 코드를 반드시 삭제해야 합니다.
